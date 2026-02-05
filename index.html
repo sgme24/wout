@@ -290,6 +290,46 @@
       font-weight: 600;
     }
 
+    .running-chart {
+      display: grid;
+      gap: 10px;
+    }
+
+    .running-bars {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      align-items: end;
+      gap: 8px;
+      height: 150px;
+    }
+
+    .run-bar {
+      display: grid;
+      align-items: end;
+      gap: 6px;
+      height: 100%;
+    }
+
+    .run-bar-fill {
+      height: var(--h);
+      border-radius: 12px;
+      background: linear-gradient(160deg, #c67648, #8a4a32);
+      box-shadow: 0 8px 16px rgba(198, 116, 72, 0.25);
+      min-height: 6px;
+    }
+
+    .run-bar-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .run-bar-value {
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+    }
+
     .entries {
       display: flex;
       flex-direction: column;
@@ -419,6 +459,10 @@
           <label for="time">시간 (분)</label>
           <input id="time" type="number" min="1" step="1" placeholder="예: 30" />
         </div>
+        <div class="field hidden" id="distanceField">
+          <label for="distance">거리 (km)</label>
+          <input id="distance" type="number" min="0" step="0.1" placeholder="예: 5" />
+        </div>
         <div class="field">
           <label for="sets">세트</label>
           <input id="sets" type="number" min="1" step="1" placeholder="예: 4" />
@@ -446,9 +490,9 @@
         <div class="panel">
           <div class="stats">
             <div class="stat">
-              <h4>선택 분할 최근 7일 총 볼륨</h4>
+              <h4 id="statVolumeLabel">선택 분할 최근 7일 총 볼륨</h4>
               <p id="statVolume">0 kg</p>
-              <div class="muted">볼륨 = 무게 × 세트 × 횟수</div>
+              <div class="muted" id="statVolumeHint">볼륨 = 무게 × 세트 × 횟수</div>
             </div>
             <div class="stat">
               <h4>오늘 기록 수</h4>
@@ -460,8 +504,12 @@
             </div>
           </div>
           <div class="stat">
-            <h4>운동별 요약</h4>
+            <h4>운동별 최고기록</h4>
             <div class="summary-grid" id="summaryGrid"></div>
+          </div>
+          <div class="stat hidden" id="runningInsights">
+            <h4>최근 7일 러닝 거리</h4>
+            <div class="running-chart" id="runningChart"></div>
           </div>
           <div class="actions">
             <button class="ghost" id="clearAllBtn" type="button">전체 삭제</button>
@@ -476,9 +524,13 @@
 
   <script>
     const splits = [
-      { id: "back-bi", label: "등/이두", presets: ["랫풀다운", "바벨 로우", "시티드 로우", "풀업", "덤벨 컬"] },
-      { id: "shoulder-tri", label: "어깨/삼두", presets: ["숄더 프레스", "OHP", "사이드 레터럴", "트라이셉스 푸시다운", "케이블 익스텐션"] },
-      { id: "chest-legs", label: "가슴/하체", presets: ["벤치프레스", "인클라인 프레스", "스쿼트", "레그프레스"] }
+      { id: "back", label: "등", type: "strength", presets: ["랫풀다운", "바벨 로우", "시티드 로우", "풀업", "데드리프트"] },
+      { id: "bi", label: "이두", type: "strength", presets: ["덤벨 컬", "바벨 컬", "해머 컬", "프리처 컬"] },
+      { id: "shoulder", label: "어깨", type: "strength", presets: ["숄더 프레스", "OHP", "사이드 레터럴", "리어 델트 플라이"] },
+      { id: "tri", label: "삼두", type: "strength", presets: ["트라이셉스 푸시다운", "케이블 익스텐션", "라잉 트라이셉스 익스텐션"] },
+      { id: "chest", label: "가슴", type: "strength", presets: ["벤치프레스", "인클라인 프레스", "덤벨 프레스", "체스트 플라이"] },
+      { id: "legs", label: "하체", type: "strength", presets: ["스쿼트", "레그프레스", "런지", "레그 익스텐션"] },
+      { id: "running", label: "런닝", type: "running", presets: ["런닝", "인터벌 러닝", "트레드밀"] }
     ];
 
     const STORAGE_KEY = "progressive_overload_logs";
@@ -491,6 +543,10 @@
     const dateInput = document.getElementById("date");
     const exerciseSelect = document.getElementById("exercise");
     const weightInput = document.getElementById("weight");
+    const timeInput = document.getElementById("time");
+    const timeField = document.getElementById("timeField");
+    const distanceInput = document.getElementById("distance");
+    const distanceField = document.getElementById("distanceField");
     const setsInput = document.getElementById("sets");
     const repsInput = document.getElementById("reps");
     const quickButtons = document.getElementById("quickButtons");
@@ -501,10 +557,14 @@
 
     const entriesEl = document.getElementById("entries");
     const statVolume = document.getElementById("statVolume");
+    const statVolumeLabel = document.getElementById("statVolumeLabel");
+    const statVolumeHint = document.getElementById("statVolumeHint");
     const statToday = document.getElementById("statToday");
     const statAll = document.getElementById("statAll");
     const summaryGrid = document.getElementById("summaryGrid");
     const clearAllBtn = document.getElementById("clearAllBtn");
+    const runningInsights = document.getElementById("runningInsights");
+    const runningChart = document.getElementById("runningChart");
 
     let activeSplit = splits[0].id;
     let entries = loadEntries();
@@ -552,6 +612,7 @@
           renderPresets();
           renderExerciseOptions();
           renderCustomList();
+          toggleInputBySplit();
           renderEntries();
         });
         splitTabs.appendChild(btn);
@@ -609,12 +670,29 @@
       });
     }
 
+    function getSplitType(splitId) {
+      return splits.find((s) => s.id === splitId)?.type || "strength";
+    }
+
+    function toggleInputBySplit() {
+      const splitType = getSplitType(activeSplit);
+      const isRunning = splitType === "running";
+      timeField.classList.toggle("hidden", !isRunning);
+      distanceField.classList.toggle("hidden", !isRunning);
+      weightInput.closest(".field").classList.toggle("hidden", isRunning);
+      setsInput.closest(".field").classList.toggle("hidden", isRunning);
+      repsInput.closest(".field").classList.toggle("hidden", isRunning);
+    }
+
     function resetForm() {
       setToday();
       exerciseSelect.value = exerciseSelect.options[0]?.value || "";
       weightInput.value = "";
+      timeInput.value = "";
+      distanceInput.value = "";
       setsInput.value = "";
       repsInput.value = "";
+      toggleInputBySplit();
       renderPresets();
     }
 
@@ -649,20 +727,28 @@
       const date = dateInput.value;
       const split = activeSplit;
       const exercise = (exerciseSelect.value || "").trim();
+      const splitType = getSplitType(split);
       const weight = Number(weightInput.value);
       const sets = Number(setsInput.value);
       const reps = Number(repsInput.value);
+      const time = Number(timeInput.value);
+      const distance = Number(distanceInput.value);
 
-      if (!date || !exercise || !weight || !sets || !reps) return;
+      if (!date || !exercise) return;
+      if (splitType === "strength" && (!weight || !sets || !reps)) return;
+      if (splitType === "running" && !time) return;
 
       entries.push({
         id: crypto.randomUUID(),
         date,
         split,
         exercise,
-        weight,
-        sets,
-        reps
+        type: splitType,
+        weight: splitType === "strength" ? weight : null,
+        sets: splitType === "strength" ? sets : null,
+        reps: splitType === "strength" ? reps : null,
+        time: splitType === "running" ? time : null,
+        distance: splitType === "running" && distance ? distance : null
       });
 
       saveEntries();
@@ -671,8 +757,18 @@
     }
 
     function formatVolume(entry) {
+      if ((entry.type || getSplitType(entry.split)) === "running") {
+        return `${entry.time || 0} 분`;
+      }
       const volume = (entry.weight || 0) * (entry.sets || 0) * (entry.reps || 0);
       return `${volume} kg`;
+    }
+
+    function formatSpeed(timeMinutes, distanceKm) {
+      if (!timeMinutes || !distanceKm) return "";
+      const hours = timeMinutes / 60;
+      const speed = distanceKm / hours;
+      return `${speed.toFixed(1)} km/h`;
     }
 
     function renderEntries() {
@@ -688,6 +784,8 @@
       filtered.forEach((entry) => {
         const card = document.createElement("div");
         card.className = "entry";
+        const isRunning = (entry.type || getSplitType(entry.split)) === "running";
+        const speed = isRunning ? formatSpeed(entry.time, entry.distance) : "";
         card.innerHTML = `
           <div class="entry-header">
             <div>${entry.exercise}</div>
@@ -695,8 +793,12 @@
               <button data-id="${entry.id}" data-action="delete">삭제</button>
             </div>
           </div>
-          <div class="entry-meta">${entry.date} · ${entry.weight}kg · ${entry.sets}세트 × ${entry.reps}회</div>
-          <div class="entry-meta">볼륨 ${formatVolume(entry)}</div>
+          <div class="entry-meta">${
+            isRunning
+              ? `${entry.date} · ${entry.time} 분${entry.distance ? ` · ${entry.distance} km` : ""}${speed ? ` · ${speed}` : ""}`
+              : `${entry.date} · ${entry.weight}kg · ${entry.sets}세트 × ${entry.reps}회`
+          }</div>
+          <div class="entry-meta">${isRunning ? "총 시간" : "볼륨"} ${formatVolume(entry)}</div>
         `;
         entriesEl.appendChild(card);
       });
@@ -710,16 +812,27 @@
       const lastWeek = new Date();
       lastWeek.setDate(lastWeek.getDate() - 7);
 
-      const recentVolume = entries
+      const splitType = getSplitType(activeSplit);
+      const recentValue = entries
         .filter((entry) => entry.split === activeSplit)
         .filter((entry) => new Date(entry.date) >= lastWeek)
-        .reduce((sum, entry) => sum + entry.weight * entry.sets * entry.reps, 0);
+        .reduce((sum, entry) => {
+          if (splitType === "running") return sum + (entry.time || 0);
+          return sum + (entry.weight || 0) * (entry.sets || 0) * (entry.reps || 0);
+        }, 0);
 
       const todayCount = entries.filter((entry) => entry.date === today).length;
 
-      statVolume.textContent = `${recentVolume} kg`;
+      statVolume.textContent = splitType === "running"
+        ? `${recentValue} 분`
+        : `${recentValue} kg`;
+      statVolumeLabel.textContent = splitType === "running"
+        ? "선택 분할 최근 7일 총 시간"
+        : "선택 분할 최근 7일 총 볼륨";
+      statVolumeHint.classList.toggle("hidden", splitType === "running");
       statToday.textContent = todayCount;
       statAll.textContent = entries.length;
+      renderRunningInsights();
     }
 
     function renderSummary() {
@@ -738,17 +851,65 @@
 
       Object.keys(byExercise).sort().forEach((name) => {
         const list = byExercise[name];
-        const latest = list.reduce((a, b) => (a.date > b.date ? a : b));
-        const maxWeight = Math.max(...list.map((e) => e.weight));
+        const splitType = getSplitType(activeSplit);
+        const best = splitType === "running"
+          ? list.reduce((a, b) => ((a.distance || 0) > (b.distance || 0) ? a : b))
+          : list.reduce((a, b) => ((a.weight || 0) > (b.weight || 0) ? a : b));
         const card = document.createElement("div");
         card.className = "summary-card";
         card.innerHTML = `
           <h5>${name}</h5>
-          <div class="big">${maxWeight} kg</div>
-          <div class="muted">최근: ${latest.date}</div>
+          <div class="big">${splitType === "running" ? `${best.distance || 0} km` : `${best.weight || 0} kg`}</div>
+          <div class="muted">${
+            splitType === "running"
+              ? `시간 ${best.time || 0} 분 · ${best.date}`
+              : `${best.weight || 0}kg · ${best.sets || 0}세트 × ${best.reps || 0}회 · ${best.date}`
+          }</div>
         `;
         summaryGrid.appendChild(card);
       });
+    }
+
+    function renderRunningInsights() {
+      const splitType = getSplitType(activeSplit);
+      runningInsights.classList.toggle("hidden", splitType !== "running");
+      if (splitType !== "running") return;
+
+      const dayLabels = ["일", "월", "화", "수", "목", "금", "토"];
+      const today = new Date();
+
+      const days = Array.from({ length: 7 }).map((_, idx) => {
+        const d = new Date(today);
+        d.setDate(today.getDate() - (6 - idx));
+        return d;
+      });
+
+      const dailyDistance = days.map((d) => {
+        const key = d.toISOString().slice(0, 10);
+        return entries
+          .filter((entry) => entry.split === activeSplit && entry.date === key)
+          .reduce((sum, entry) => sum + (entry.distance || 0), 0);
+      });
+
+      const maxDistance = Math.max(1, ...dailyDistance);
+      runningChart.innerHTML = "";
+      const bars = document.createElement("div");
+      bars.className = "running-bars";
+
+      dailyDistance.forEach((km, idx) => {
+        const bar = document.createElement("div");
+        bar.className = "run-bar";
+        const height = Math.round((km / maxDistance) * 100);
+        const label = dayLabels[days[idx].getDay()];
+        bar.innerHTML = `
+          <div class="run-bar-value">${km.toFixed(1)} km</div>
+          <div class="run-bar-fill" style="--h:${height}%"></div>
+          <div class="run-bar-label">${label}</div>
+        `;
+        bars.appendChild(bar);
+      });
+
+      runningChart.appendChild(bars);
     }
 
     function handleEntryAction(e) {
@@ -808,6 +969,7 @@
     renderExerciseOptions();
     renderPresets();
     renderCustomList();
+    toggleInputBySplit();
     renderEntries();
   </script>
   <script>
