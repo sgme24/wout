@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>운동 기록</title>
+  <meta name="theme-color" content="#1b1816" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #1b1816;
+      --bg-2: #272320;
+      --ink: #f1ece6;
+      --accent: #b65f3c;
+      --card: rgba(32, 29, 27, 0.92);
+      --muted: rgba(241, 236, 230, 0.6);
+      --pill: #2a2522;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 420px at 10% -10%, #2b2622, transparent 70%),
+        radial-gradient(800px 420px at 110% 0%, #161312, transparent 60%),
+        linear-gradient(160deg, var(--bg), #110f0e);
+      min-height: 100vh;
+      padding: 32px 16px 48px;
+    }
+
+    .app {
+      width: min(1100px, 100%);
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: 0 28px 80px rgba(40, 20, 10, 0.12);
+      backdrop-filter: blur(16px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .blob {
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      background: #8a4a32;
+      filter: blur(90px);
+      opacity: 0.22;
+      border-radius: 50%;
+      top: -120px;
+      right: -60px;
+      pointer-events: none;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .title {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: clamp(32px, 6vw, 56px);
+      margin: 0;
+      letter-spacing: 1px;
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .split-tabs, .view-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .split-tabs button, .view-tabs button {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #1f1b1a;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    .split-tabs button.active, .view-tabs button.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 10px 20px rgba(255, 107, 45, 0.25);
+    }
+
+    .view-tabs button.glow {
+      animation: pulseGlow 0.6s ease;
+    }
+
+    .panel {
+      background: rgba(30, 27, 25, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 22px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+    }
+
+    .field input, .field select {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 14px;
+      background: #1f1b1a;
+      font-family: inherit;
+      color: var(--ink);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .primary, .ghost {
+      padding: 12px 16px;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: 600;
+      border: none;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(255, 107, 45, 0.25);
+    }
+
+    .ghost {
+      background: #1f1b1a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .quick {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .quick button {
+      background: var(--pill);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    .quick button.active {
+      background: var(--accent);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(198, 116, 72, 0.35);
+    }
+
+    .adder {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .adder input {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 14px;
+      background: #1f1b1a;
+      font-family: inherit;
+      color: var(--ink);
+    }
+
+    .custom-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .custom-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #1f1b1a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 12px;
+    }
+
+    .custom-pill button {
+      border: none;
+      background: #2a2522;
+      border-radius: 999px;
+      padding: 2px 6px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--ink);
+    }
+
+    .stats {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stat {
+      background: #1f1b1a;
+      border-radius: 16px;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .stat h4 {
+      margin: 0 0 6px;
+      font-size: 14px;
+    }
+
+    .stat p {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+    }
+
+    .summary-card {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 10px;
+      background: #1f1b1a;
+      display: grid;
+      gap: 6px;
+    }
+
+    .summary-card h5 {
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .summary-card .big {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .entries {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 560px;
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+
+    .entry {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 12px;
+      background: #1f1b1a;
+      display: grid;
+      gap: 6px;
+    }
+
+    .entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+
+    .entry-meta {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .entry-actions button {
+      border: none;
+      background: #2a2522;
+      padding: 6px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--ink);
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 rgba(198, 116, 72, 0.0); }
+      50% { box-shadow: 0 0 18px rgba(198, 116, 72, 0.6); }
+      100% { box-shadow: 0 0 0 rgba(198, 116, 72, 0.0); }
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 20px 12px 32px;
+      }
+      .app {
+        padding: 20px;
+      }
+      header {
+        align-items: flex-start;
+      }
+      .title {
+        font-size: clamp(28px, 8vw, 42px);
+      }
+      .split-tabs button,
+      .view-tabs button {
+        padding: 6px 10px;
+        font-size: 13px;
+      }
+      .actions {
+        flex-direction: column;
+      }
+      .primary, .ghost {
+        width: 100%;
+        text-align: center;
+      }
+      .adder {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="blob"></div>
+    <header>
+      <div>
+        <h1 class="title">Workout Log</h1>
+        <p class="subtitle">입력과 기록 보기를 한 페이지에서 전환합니다.</p>
+      </div>
+      <div class="view-tabs" id="viewTabs">
+        <button type="button" data-view="input" class="active">기록 입력</button>
+        <button type="button" data-view="records">기록 보기</button>
+      </div>
+      <div class="split-tabs" id="splitTabs"></div>
+    </header>
+
+    <section id="inputSection" class="panel">
+      <div class="form-grid">
+        <div class="field">
+          <label for="date">날짜</label>
+          <input id="date" type="date" />
+        </div>
+        <div class="field">
+          <label for="exercise">운동 이름</label>
+          <select id="exercise"></select>
+        </div>
+        <div class="field">
+          <label for="weight">무게 (kg)</label>
+          <input id="weight" type="number" min="0" step="0.5" placeholder="예: 45" />
+        </div>
+        <div class="field">
+          <label for="sets">세트</label>
+          <input id="sets" type="number" min="1" step="1" placeholder="예: 4" />
+        </div>
+        <div class="field">
+          <label for="reps">횟수</label>
+          <input id="reps" type="number" min="1" step="1" placeholder="예: 10" />
+        </div>
+      </div>
+
+      <div class="quick" id="quickButtons"></div>
+      <div class="adder">
+        <input id="newExercise" type="text" placeholder="새 운동 추가" />
+        <button class="ghost" id="addExerciseBtn" type="button">운동 추가</button>
+      </div>
+      <div class="custom-list" id="customList"></div>
+
+      <div class="actions">
+        <button class="primary" id="addBtn">기록 추가</button>
+      </div>
+    </section>
+
+    <section id="recordsSection" class="panel hidden">
+      <div class="grid">
+        <div class="panel">
+          <div class="stats">
+            <div class="stat">
+              <h4>선택 분할 최근 7일 총 볼륨</h4>
+              <p id="statVolume">0 kg</p>
+              <div class="muted">볼륨 = 무게 × 세트 × 횟수</div>
+            </div>
+            <div class="stat">
+              <h4>오늘 기록 수</h4>
+              <p id="statToday">0</p>
+            </div>
+            <div class="stat">
+              <h4>전체 기록 수</h4>
+              <p id="statAll">0</p>
+            </div>
+          </div>
+          <div class="stat">
+            <h4>운동별 요약</h4>
+            <div class="summary-grid" id="summaryGrid"></div>
+          </div>
+          <div class="actions">
+            <button class="ghost" id="clearAllBtn" type="button">전체 삭제</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="entries" id="entries"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const splits = [
+      { id: "back-bi", label: "등/이두", presets: ["랫풀다운", "바벨 로우", "시티드 로우", "풀업", "덤벨 컬"] },
+      { id: "shoulder-tri", label: "어깨/삼두", presets: ["숄더 프레스", "OHP", "사이드 레터럴", "트라이셉스 푸시다운", "케이블 익스텐션"] },
+      { id: "chest-legs", label: "가슴/하체", presets: ["벤치프레스", "인클라인 프레스", "스쿼트", "레그프레스"] }
+    ];
+
+    const STORAGE_KEY = "progressive_overload_logs";
+
+    const viewTabs = document.getElementById("viewTabs");
+    const inputSection = document.getElementById("inputSection");
+    const recordsSection = document.getElementById("recordsSection");
+
+    const splitTabs = document.getElementById("splitTabs");
+    const dateInput = document.getElementById("date");
+    const exerciseSelect = document.getElementById("exercise");
+    const weightInput = document.getElementById("weight");
+    const setsInput = document.getElementById("sets");
+    const repsInput = document.getElementById("reps");
+    const quickButtons = document.getElementById("quickButtons");
+    const addBtn = document.getElementById("addBtn");
+    const newExerciseInput = document.getElementById("newExercise");
+    const addExerciseBtn = document.getElementById("addExerciseBtn");
+    const customList = document.getElementById("customList");
+
+    const entriesEl = document.getElementById("entries");
+    const statVolume = document.getElementById("statVolume");
+    const statToday = document.getElementById("statToday");
+    const statAll = document.getElementById("statAll");
+    const summaryGrid = document.getElementById("summaryGrid");
+    const clearAllBtn = document.getElementById("clearAllBtn");
+
+    let activeSplit = splits[0].id;
+    let entries = loadEntries();
+    let customPresets = loadCustomPresets();
+
+    function setToday() {
+      const today = new Date();
+      dateInput.value = today.toISOString().slice(0, 10);
+    }
+
+    function loadEntries() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveEntries() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    }
+
+    function loadCustomPresets() {
+      try {
+        return JSON.parse(localStorage.getItem("custom_exercises")) || {};
+      } catch {
+        return {};
+      }
+    }
+
+    function saveCustomPresets() {
+      localStorage.setItem("custom_exercises", JSON.stringify(customPresets));
+    }
+
+    function renderTabs() {
+      splitTabs.innerHTML = "";
+      splits.forEach((split) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = split.label;
+        if (split.id === activeSplit) btn.classList.add("active");
+        btn.addEventListener("click", () => {
+          activeSplit = split.id;
+          renderTabs();
+          renderPresets();
+          renderExerciseOptions();
+          renderCustomList();
+          renderEntries();
+        });
+        splitTabs.appendChild(btn);
+      });
+    }
+
+    function renderPresets() {
+      quickButtons.innerHTML = "";
+      const defaults = splits.find((s) => s.id === activeSplit).presets;
+      const customs = customPresets[activeSplit] || [];
+      const presets = [...defaults, ...customs];
+      presets.forEach((preset) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = preset;
+        if (preset === exerciseSelect.value) btn.classList.add("active");
+        btn.addEventListener("click", () => setSelectedExercise(preset));
+        quickButtons.appendChild(btn);
+      });
+    }
+
+    function renderExerciseOptions() {
+      exerciseSelect.innerHTML = "";
+      const defaults = splits.find((s) => s.id === activeSplit).presets;
+      const customs = customPresets[activeSplit] || [];
+      const presets = [...defaults, ...customs];
+      presets.forEach((preset, idx) => {
+        const option = document.createElement("option");
+        option.value = preset;
+        option.textContent = preset;
+        if (idx === 0) option.selected = true;
+        exerciseSelect.appendChild(option);
+      });
+    }
+
+    function setSelectedExercise(name) {
+      exerciseSelect.value = name;
+      Array.from(quickButtons.querySelectorAll("button")).forEach((btn) => {
+        btn.classList.toggle("active", btn.textContent === name);
+      });
+    }
+
+    function renderCustomList() {
+      customList.innerHTML = "";
+      const customs = customPresets[activeSplit] || [];
+      if (customs.length === 0) return;
+      customs.forEach((name) => {
+        const pill = document.createElement("div");
+        pill.className = "custom-pill";
+        pill.innerHTML = `
+          <span>${name}</span>
+          <button type="button" data-name="${name}" aria-label="삭제">x</button>
+        `;
+        customList.appendChild(pill);
+      });
+    }
+
+    function resetForm() {
+      setToday();
+      exerciseSelect.value = exerciseSelect.options[0]?.value || "";
+      weightInput.value = "";
+      setsInput.value = "";
+      repsInput.value = "";
+      renderPresets();
+    }
+
+    function addExercise() {
+      const name = (newExerciseInput.value || "").trim();
+      if (!name) return;
+      const defaults = splits.find((s) => s.id === activeSplit).presets;
+      const customs = customPresets[activeSplit] || [];
+      if (defaults.includes(name) || customs.includes(name)) {
+        newExerciseInput.value = "";
+        return;
+      }
+      customPresets[activeSplit] = [...customs, name];
+      saveCustomPresets();
+      newExerciseInput.value = "";
+      renderPresets();
+      renderExerciseOptions();
+      renderCustomList();
+      setSelectedExercise(name);
+    }
+
+    function deleteCustom(name) {
+      const customs = customPresets[activeSplit] || [];
+      customPresets[activeSplit] = customs.filter((item) => item !== name);
+      saveCustomPresets();
+      renderPresets();
+      renderExerciseOptions();
+      renderCustomList();
+    }
+
+    function addEntry() {
+      const date = dateInput.value;
+      const split = activeSplit;
+      const exercise = (exerciseSelect.value || "").trim();
+      const weight = Number(weightInput.value);
+      const sets = Number(setsInput.value);
+      const reps = Number(repsInput.value);
+
+      if (!date || !exercise || !weight || !sets || !reps) return;
+
+      entries.push({
+        id: crypto.randomUUID(),
+        date,
+        split,
+        exercise,
+        weight,
+        sets,
+        reps
+      });
+
+      saveEntries();
+      renderEntries();
+      resetForm();
+    }
+
+    function formatVolume(entry) {
+      const volume = (entry.weight || 0) * (entry.sets || 0) * (entry.reps || 0);
+      return `${volume} kg`;
+    }
+
+    function renderEntries() {
+      entriesEl.innerHTML = "";
+      const filtered = entries
+        .filter((entry) => entry.split === activeSplit)
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      if (filtered.length === 0) {
+        entriesEl.innerHTML = "<div class=\"muted\">아직 기록이 없어요.</div>";
+      }
+
+      filtered.forEach((entry) => {
+        const card = document.createElement("div");
+        card.className = "entry";
+        card.innerHTML = `
+          <div class="entry-header">
+            <div>${entry.exercise}</div>
+            <div class="entry-actions">
+              <button data-id="${entry.id}" data-action="delete">삭제</button>
+            </div>
+          </div>
+          <div class="entry-meta">${entry.date} · ${entry.weight}kg · ${entry.sets}세트 × ${entry.reps}회</div>
+          <div class="entry-meta">볼륨 ${formatVolume(entry)}</div>
+        `;
+        entriesEl.appendChild(card);
+      });
+
+      updateStats();
+      renderSummary();
+    }
+
+    function updateStats() {
+      const today = new Date().toISOString().slice(0, 10);
+      const lastWeek = new Date();
+      lastWeek.setDate(lastWeek.getDate() - 7);
+
+      const recentVolume = entries
+        .filter((entry) => entry.split === activeSplit)
+        .filter((entry) => new Date(entry.date) >= lastWeek)
+        .reduce((sum, entry) => sum + entry.weight * entry.sets * entry.reps, 0);
+
+      const todayCount = entries.filter((entry) => entry.date === today).length;
+
+      statVolume.textContent = `${recentVolume} kg`;
+      statToday.textContent = todayCount;
+      statAll.textContent = entries.length;
+    }
+
+    function renderSummary() {
+      summaryGrid.innerHTML = "";
+      const filtered = entries.filter((entry) => entry.split === activeSplit);
+      if (filtered.length === 0) {
+        summaryGrid.innerHTML = "<div class=\"muted\">기록이 없어요.</div>";
+        return;
+      }
+
+      const byExercise = {};
+      filtered.forEach((entry) => {
+        if (!byExercise[entry.exercise]) byExercise[entry.exercise] = [];
+        byExercise[entry.exercise].push(entry);
+      });
+
+      Object.keys(byExercise).sort().forEach((name) => {
+        const list = byExercise[name];
+        const latest = list.reduce((a, b) => (a.date > b.date ? a : b));
+        const maxWeight = Math.max(...list.map((e) => e.weight));
+        const card = document.createElement("div");
+        card.className = "summary-card";
+        card.innerHTML = `
+          <h5>${name}</h5>
+          <div class="big">${maxWeight} kg</div>
+          <div class="muted">최근: ${latest.date}</div>
+        `;
+        summaryGrid.appendChild(card);
+      });
+    }
+
+    function handleEntryAction(e) {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+
+      if (action === "delete") {
+        entries = entries.filter((entry) => entry.id !== id);
+        saveEntries();
+        renderEntries();
+      }
+    }
+
+    function switchView(view) {
+      const isInput = view === "input";
+      inputSection.classList.toggle("hidden", !isInput);
+      recordsSection.classList.toggle("hidden", isInput);
+      Array.from(viewTabs.querySelectorAll("button")).forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.view === view);
+      });
+    }
+
+    viewTabs.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-view]");
+      if (!btn) return;
+      switchView(btn.dataset.view);
+    });
+
+    addBtn.addEventListener("click", addEntry);
+    addExerciseBtn.addEventListener("click", addExercise);
+    newExerciseInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addExercise();
+      }
+    });
+    customList.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-name]");
+      if (!btn) return;
+      deleteCustom(btn.dataset.name);
+    });
+    exerciseSelect.addEventListener("change", () => {
+      setSelectedExercise(exerciseSelect.value);
+    });
+    entriesEl.addEventListener("click", handleEntryAction);
+    clearAllBtn.addEventListener("click", () => {
+      if (!confirm("정말 전체 기록을 삭제할까요?")) return;
+      entries = [];
+      localStorage.removeItem(STORAGE_KEY);
+      renderEntries();
+    });
+
+    setToday();
+    renderTabs();
+    renderExerciseOptions();
+    renderPresets();
+    renderCustomList();
+    renderEntries();
+  </script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
